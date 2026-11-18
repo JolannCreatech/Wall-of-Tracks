@@ -1,24 +1,6 @@
 const dom = {
-  livePill: document.querySelector("#live-pill"),
-  liveCopy: document.querySelector("#live-copy"),
-  helpButton: document.querySelector("#help-button"),
-  infoDialog: document.querySelector("#info-dialog"),
-  dialogClose: document.querySelector("#dialog-close"),
-  featureFrame: document.querySelector("#feature-frame"),
-  featureImage: document.querySelector("#feature-image"),
-  featureFallback: document.querySelector("#feature-fallback"),
-  featureIndex: document.querySelector("#feature-index"),
-  featureTitle: document.querySelector("#feature-title"),
-  featureArtist: document.querySelector("#feature-artist"),
-  featureMeta: document.querySelector("#feature-meta"),
-  featureTracks: document.querySelector("#feature-tracks"),
-  openExhibit: document.querySelector("#open-exhibit"),
-  statTracks: document.querySelector("#stat-tracks"),
-  statAlbums: document.querySelector("#stat-albums"),
-  statArtists: document.querySelector("#stat-artists"),
-  sourceNote: document.querySelector("#source-note"),
-  deviceUser: document.querySelector("#device-user"),
-  footerTime: document.querySelector("#footer-time"),
+  listenerButton: document.querySelector("#listener-button"),
+  listenerName: document.querySelector("#listener-name"),
   screen: document.querySelector("#screen"),
   screenContent: document.querySelector("#screen-content"),
   statusLeft: document.querySelector("#status-left"),
@@ -44,14 +26,7 @@ const state = {
   detailFrom: null,
   detailIndex: 0,
   nowIndex: 0,
-  featureKey: null,
-  featureAlbum: null,
-  externalAction: "none",
-  loading: true,
   error: null,
-  warning: null,
-  cache: null,
-  receivedAt: 0,
   connectError: "",
   connectDraft: "",
   loadToken: 0,
@@ -63,8 +38,7 @@ const MENU_ITEMS = [
   { id: "tracks", label: "Recently Played", icon: "tracks" },
   { id: "albums", label: "Albums", icon: "albums" },
   { id: "artists", label: "Artists", icon: "artists" },
-  { id: "clock", label: "Listening Clock", icon: "clock" },
-  { id: "about", label: "The Source", icon: "about" },
+  { id: "clock", label: "Clock", icon: "clock" },
 ];
 
 const ART_PALETTES = [
@@ -91,20 +65,14 @@ const ICONS = {
     '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.5" r="2.35"/><path d="M3.8 13c.4-2.8 2-4.2 4.2-4.2s3.8 1.4 4.2 4.2"/></svg>',
   clock:
     '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.7"/><path d="M8 2.3v1.1M8 12.6v1.1M2.3 8h1.1M12.6 8h1.1M8 5.2V8l2 1.2"/></svg>',
-  about:
-    '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.7"/><path d="M8 7.1v3.3M8 5.2v.2"/></svg>',
 };
 
 init();
 
 function init() {
   bindEvents();
-  setFeatureLoading();
+  updateListener();
   renderScreen();
-  updatePageChrome();
-  tickFooter();
-  window.setInterval(tickFooter, 30_000);
-  window.setInterval(updatePageChrome, 15_000);
   boot();
 }
 
@@ -119,35 +87,30 @@ async function boot() {
     const candidate = cleanUsername(queryUser || storedUser || config.defaultUser || "");
 
     if (!config.serverReady) {
-      state.loading = false;
       state.username = candidate || null;
       state.screen = "connect";
       state.connectError = "Add LASTFM_KEY to .env, then restart the server.";
-      showExternalIdle("setup");
+      updateListener();
       renderScreen();
-      updatePageChrome();
       return;
     }
 
     if (!candidate) {
       await delay(Math.max(0, 520 - (Date.now() - bootStarted)));
-      state.loading = false;
       state.screen = "connect";
-      showExternalIdle("connect");
+      updateListener();
       renderScreen();
-      updatePageChrome();
       return;
     }
 
     state.username = candidate;
+    updateListener();
     await loadRecent({ minimumBootMs: 680 });
   } catch (error) {
-    state.loading = false;
     state.error = friendlyError(error);
     state.screen = "error";
-    showExternalError(state.error);
+    updateListener();
     renderScreen();
-    updatePageChrome();
   }
 }
 
@@ -160,14 +123,11 @@ async function loadRecent({ minimumBootMs = 600 } = {}) {
 
   const token = ++state.loadToken;
   const started = Date.now();
-  state.loading = true;
   state.error = null;
-  state.warning = null;
   state.screen = "boot";
   state.eqPaused = false;
+  updateListener();
   renderScreen();
-  updatePageChrome();
-  if (!state.data) setFeatureLoading();
 
   try {
     const payload = await fetchJson(`api/recent?user=${encodeURIComponent(username)}`);
@@ -185,32 +145,22 @@ async function loadRecent({ minimumBootMs = 600 } = {}) {
     if (token !== state.loadToken) return;
 
     const message = friendlyError(error);
-    state.loading = false;
     state.error = message;
 
     if (state.data?.tracks?.length) {
-      state.warning = message;
       state.screen = "menu";
       renderScreen();
-      updatePageChrome();
-      showToast(`${message} Showing the last saved wall.`);
+      showToast(message);
     } else {
       state.screen = "error";
-      showExternalError(message);
       renderScreen();
-      updatePageChrome();
     }
   }
 }
 
 function applyData(payload, requestedUser) {
-  const firstLoad = !state.data;
   state.data = payload;
-  state.loading = false;
   state.error = null;
-  state.warning = payload.warning || null;
-  state.cache = payload.cache || null;
-  state.receivedAt = Date.now();
   state.username = cleanUsername(payload.user?.name || requestedUser);
   state.trackById = new Map(payload.tracks.map((track) => [track.id, track]));
   state.menuIndex = 0;
@@ -219,8 +169,6 @@ function applyData(payload, requestedUser) {
   state.detail = null;
   state.detailFrom = null;
   state.detailIndex = 0;
-  state.featureKey = null;
-  state.featureAlbum = null;
   state.eqPaused = false;
 
   const nowIndex = payload.tracks.findIndex((track) => track.nowPlaying);
@@ -228,22 +176,9 @@ function applyData(payload, requestedUser) {
 
   rememberUser(state.username);
 
-  if (!payload.tracks.length) {
-    state.screen = "empty";
-    setFeatureEmpty();
-    updateExternalStats(payload.stats);
-    setExternalAction("refresh", "Refresh the wall");
-  } else {
-    state.screen = "menu";
-    const leadAlbum = payload.albums[0] || null;
-    if (leadAlbum) setFeature(leadAlbum, { animate: firstLoad });
-    else setFeatureEmpty();
-    updateExternalStats(payload.stats);
-    setExternalAction("open", "Open in the iPod");
-  }
-
+  state.screen = payload.tracks.length ? "menu" : "empty";
+  updateListener();
   renderScreen();
-  updatePageChrome();
 
   if (payload.warning) {
     showToast(payload.warning);
@@ -283,14 +218,7 @@ async function fetchJson(url) {
 }
 
 function bindEvents() {
-  dom.helpButton.addEventListener("click", openDialog);
-  dom.dialogClose.addEventListener("click", () => dom.infoDialog.close());
-  dom.infoDialog.addEventListener("click", (event) => {
-    if (event.target === dom.infoDialog) dom.infoDialog.close();
-  });
-
-  dom.featureFrame.addEventListener("click", handleExternalAction);
-  dom.openExhibit.addEventListener("click", handleExternalAction);
+  dom.listenerButton.addEventListener("click", showConnect);
 
   dom.wheelMenu.addEventListener("click", goBack);
   dom.wheelPrev.addEventListener("click", () => wheelStep(-1));
@@ -416,7 +344,6 @@ function wheelStep(direction) {
     if (next !== state.cfIndex) {
       state.cfIndex = next;
       updateCoverflow();
-      setFeature(albums[next]);
     }
     return;
   }
@@ -428,7 +355,6 @@ function wheelStep(direction) {
     if (next !== state.listIndex[screen]) {
       state.listIndex[screen] = next;
       renderScreen();
-      previewFromCurrentScreen();
     }
     return;
   }
@@ -440,7 +366,6 @@ function wheelStep(direction) {
     if (next !== state.detailIndex) {
       state.detailIndex = next;
       renderScreen();
-      previewFromCurrentScreen();
     }
     return;
   }
@@ -453,7 +378,6 @@ function wheelStep(direction) {
       state.nowIndex = next;
       state.eqPaused = false;
       renderScreen();
-      previewFromCurrentScreen();
     }
   }
 }
@@ -502,7 +426,6 @@ function pressPlay() {
   if (state.screen === "now") {
     state.eqPaused = !state.eqPaused;
     renderScreen();
-    if (!state.eqPaused) previewFromCurrentScreen();
     return;
   }
 
@@ -510,39 +433,30 @@ function pressPlay() {
 }
 
 function goBack() {
-  if (dom.infoDialog.open) {
-    dom.infoDialog.close();
-    return;
-  }
   if (state.screen === "menu" || state.screen === "boot") return;
 
   if (state.screen === "album") {
     const destination = detailDestination("albums");
     state.screen = destination;
     renderScreen();
-    previewFromCurrentScreen();
     return;
   }
   if (state.screen === "artist") {
     const destination = detailDestination("artists");
     state.screen = destination;
     renderScreen();
-    previewFromCurrentScreen();
     return;
   }
   if (state.screen === "connect") {
     if (state.data) {
       state.screen = "menu";
       renderScreen();
-      updatePageChrome();
-      if (state.featureAlbum) setFeature(state.featureAlbum);
     }
     return;
   }
   if (state.data?.tracks?.length) {
     state.screen = "menu";
     renderScreen();
-    previewTopAlbum();
     return;
   }
   if (state.screen === "error" || state.screen === "empty") {
@@ -566,10 +480,6 @@ function activateMenu() {
       state.screen = "clock";
       renderScreen();
       break;
-    case "about":
-      state.screen = "about";
-      renderScreen();
-      break;
     default:
       break;
   }
@@ -585,7 +495,6 @@ function openCoverflow(index = state.cfIndex) {
   state.cfIndex = clamp(index, 0, albums.length - 1);
   state.screen = "coverflow";
   renderScreen();
-  setFeature(albums[state.cfIndex]);
 }
 
 function openList(screen) {
@@ -598,7 +507,6 @@ function openList(screen) {
   state.listIndex[screen] = clamp(state.listIndex[screen], 0, items.length - 1);
   state.screen = screen;
   renderScreen();
-  previewFromCurrentScreen();
 }
 
 function openAlbum(album) {
@@ -610,7 +518,6 @@ function openAlbum(album) {
   state.detailIndex = 0;
   state.screen = "album";
   renderScreen();
-  setFeature(album);
 }
 
 function openArtist(artist) {
@@ -622,7 +529,6 @@ function openArtist(artist) {
   state.detailIndex = 0;
   state.screen = "artist";
   renderScreen();
-  previewFromCurrentScreen();
 }
 
 function openNow(index) {
@@ -632,7 +538,6 @@ function openNow(index) {
   state.screen = "now";
   state.eqPaused = false;
   renderScreen();
-  previewFromCurrentScreen();
 }
 
 function openNowAlbum() {
@@ -707,8 +612,6 @@ function handleScreenClick(event) {
     } else {
       state.cfIndex = clamp(index, 0, (state.data?.albums?.length || 1) - 1);
       updateCoverflow();
-      const album = state.data?.albums?.[state.cfIndex];
-      if (album) setFeature(album);
     }
     return;
   }
@@ -764,18 +667,15 @@ function handleScreenSubmit(event) {
 
   if (username.toLocaleLowerCase() !== (state.data?.user?.name || "").toLocaleLowerCase()) {
     state.data = null;
-    state.featureKey = null;
-    state.featureAlbum = null;
-    setFeatureLoading();
   }
   state.username = username;
   state.connectError = "";
   state.connectDraft = "";
+  updateListener();
   loadRecent({ minimumBootMs: 700 });
 }
 
 function handleKeyboard(event) {
-  if (dom.infoDialog.open) return;
   const target = event.target;
   const typing = target instanceof HTMLElement && (target.matches("input, textarea, select") || target.isContentEditable);
   const interactive = target instanceof HTMLElement && target.closest("button, a, input, textarea, select");
@@ -821,30 +721,6 @@ function handleKeyboard(event) {
   }
 }
 
-function handleExternalAction() {
-  switch (state.externalAction) {
-    case "open": {
-      const album = state.featureAlbum || state.data?.albums?.[0];
-      if (album) {
-        const index = state.data?.albums?.findIndex((item) => item.key === album.key) ?? 0;
-        openCoverflow(Math.max(0, index));
-      }
-      break;
-    }
-    case "retry":
-    case "refresh":
-      refreshWall();
-      break;
-    case "connect":
-      if (state.screen !== "connect") showConnect();
-      window.setTimeout(() => dom.screen.querySelector(".connect-form input")?.focus(), 120);
-      break;
-    default:
-      showToast("The wall is still tuning in.");
-      break;
-  }
-}
-
 function refreshWall() {
   if (!state.username) {
     showConnect();
@@ -861,8 +737,7 @@ function showConnect() {
     : "";
   state.connectDraft = state.username || "";
   renderScreen();
-  updatePageChrome();
-  if (!state.data) showExternalIdle(state.config?.serverReady === false ? "setup" : "connect");
+  updateListener();
 }
 
 /* Rendering */
@@ -903,8 +778,6 @@ function buildScreen(screen) {
       return { theme: "dark", html: nowMarkup(), label: "Now playing" };
     case "clock":
       return { theme: "light", html: clockMarkup(), label: "Listening clock" };
-    case "about":
-      return { theme: "light", html: aboutMarkup(), label: "About this wall" };
     case "connect":
       return { theme: "light", html: connectMarkup(), label: "Connect Last.fm" };
     case "error":
@@ -921,7 +794,6 @@ function bootMarkup() {
     <div class="boot-view">
       <span class="boot-record" aria-hidden="true"></span>
       <h2>Wall of Tracks</h2>
-      <p>Tuning the gallery</p>
       <span class="boot-bars" aria-hidden="true"><i></i><i></i><i></i></span>
     </div>`;
 }
@@ -936,22 +808,15 @@ function titlebar(title, meta = "") {
 
 function menuMarkup() {
   const trackCount = state.data?.tracks?.length || 0;
-  const albumCount = state.data?.albums?.length || 0;
-  const rows = MENU_ITEMS.map((item, index) => {
-    let trail = "";
-    if (item.id === "coverflow") trail = `${formatCount(albumCount)} ${plural(albumCount, "sleeve", "sleeves")}`;
-    if (item.id === "tracks") trail = `${formatCount(trackCount)}`;
-    return `
+  const rows = MENU_ITEMS.map((item, index) => `
       <button class="ipod-row${index === state.menuIndex ? " is-selected" : ""}" type="button" data-menu-index="${index}">
         ${ICONS[item.icon] || ""}
         <span>${escapeHtml(item.label)}</span>
-        ${trail ? `<span class="row-trail">${escapeHtml(trail)}</span>` : ""}
         <span class="row-chevron" aria-hidden="true">›</span>
-      </button>`;
-  }).join("");
+      </button>`).join("");
 
   return `
-    ${titlebar("Wall of Tracks", `${formatCount(trackCount)} ${plural(trackCount, "TRACK", "TRACKS")}`)}
+    ${titlebar("iPod", `${formatCount(trackCount)} ${plural(trackCount, "TRACK", "TRACKS")}`)}
     <div class="ipod-menu">${rows}</div>`;
 }
 
@@ -1038,7 +903,7 @@ function listRowMarkup({ index, selected, image, title, subtitle, tail, artist =
 }
 
 function emptyListMarkup() {
-  return `<div class="screen-message"><h3>Nothing here yet.</h3><p>Play something on Last.fm and the shelves will fill.</p></div>`;
+  return `<div class="screen-message"><h3>Nothing here yet.</h3></div>`;
 }
 
 function detailScreenMarkup(kind) {
@@ -1048,7 +913,7 @@ function detailScreenMarkup(kind) {
   const tracks = getDetailTracks();
   if (!tracks.length) {
     return `${titlebar(kind === "album" ? "Album" : "Artist", "0 TRACKS")}
-      <div class="screen-message"><h3>A silent room.</h3><p>No recent tracks are attached to this sleeve.</p></div>`;
+      <div class="screen-message"><h3>No tracks.</h3></div>`;
   }
 
   const index = clamp(state.detailIndex, 0, tracks.length - 1);
@@ -1092,7 +957,7 @@ function coverflowMarkup() {
   const albums = state.data?.albums || [];
   if (!albums.length) {
     return `${titlebar("Cover Flow", "0 ALBUMS")}
-      <div class="screen-message"><h3>The sleeves are blank.</h3><p>No recent albums to hang on the wall yet.</p></div>`;
+      <div class="screen-message"><h3>No albums.</h3></div>`;
   }
 
   const coverMarkup = albums.map((album, index) => `
@@ -1128,11 +993,11 @@ function updateCoverflow() {
     if (offset === 0) {
       transform = "translateX(0) translateZ(30px) rotateY(0deg) scale(1)";
     } else if (distance === 1) {
-      transform = `translateX(${offset * 82}px) translateZ(-28px) rotateY(${offset < 0 ? 34 : -34}deg) scale(.78)`;
+      transform = `translateX(${offset * 94}px) translateZ(-28px) rotateY(${offset < 0 ? 34 : -34}deg) scale(.78)`;
     } else if (distance === 2) {
-      transform = `translateX(${offset * 132}px) translateZ(-70px) rotateY(${offset < 0 ? 42 : -42}deg) scale(.59)`;
+      transform = `translateX(${offset * 151}px) translateZ(-70px) rotateY(${offset < 0 ? 42 : -42}deg) scale(.59)`;
     } else if (distance === 3) {
-      transform = `translateX(${offset * 164}px) translateZ(-110px) rotateY(${offset < 0 ? 48 : -48}deg) scale(.48)`;
+      transform = `translateX(${offset * 188}px) translateZ(-110px) rotateY(${offset < 0 ? 48 : -48}deg) scale(.48)`;
     }
 
     cover.style.transform = transform;
@@ -1164,7 +1029,7 @@ function nowMarkup() {
   const track = tracks[state.nowIndex];
   if (!track) {
     return `${titlebar("Now Playing", "0 TRACKS")}
-      <div class="screen-message"><h3>Nothing is spinning.</h3><p>Pick a scrobble from your recent tracks.</p></div>`;
+      <div class="screen-message"><h3>Nothing playing.</h3></div>`;
   }
 
   const isLive = Boolean(track.nowPlaying);
@@ -1226,7 +1091,7 @@ function clockMarkup() {
     const x2 = 70 + Math.cos(angle) * outer;
     const y2 = 70 + Math.sin(angle) * outer;
     const width = count ? 2.4 : 1.1;
-    const color = hour === peakHour && count ? "#df512f" : count ? "#8a8175" : "rgba(98,88,75,.22)";
+    const color = hour === peakHour && count ? "#0071e3" : count ? "#8a8175" : "rgba(98,88,75,.22)";
     return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round" />`;
   }).join("");
 
@@ -1238,12 +1103,9 @@ function clockMarkup() {
   }).join("");
 
   const headline = hasData ? clockHeadline(peakHour) : "A quiet dial.";
-  const copy = hasData
-    ? "Each spoke is one hour of your local time, drawn from the recent scrobbles in this view."
-    : "Play a little music and your hours will appear around the dial.";
 
   return `
-    ${titlebar("Listening Clock", "LOCAL TIME")}
+    ${titlebar("Clock", "LOCAL TIME")}
     <div class="clock-view">
       <div class="clock-chart">
         <svg viewBox="0 0 140 140" role="img" aria-label="${hasData ? `${total} scrobbles arranged by hour; the busiest is ${peakLabel}` : "No timed scrobbles in this view"}">
@@ -1258,75 +1120,49 @@ function clockMarkup() {
       <div class="clock-copy">
         <p class="clock-kicker">When you listen</p>
         <p class="clock-lead">${escapeHtml(headline)}</p>
-        <p class="clock-body">${escapeHtml(copy)}</p>
         <div class="clock-facts">
-          <div class="clock-fact"><span>Peak hour</span><strong>${escapeHtml(peakLabel)}</strong></div>
-          <div class="clock-fact"><span>Hours alive</span><strong>${hasData ? activeHours : "—"}</strong></div>
-          <div class="clock-fact"><span>After dark</span><strong>${hasData ? `${lateShare}%` : "—"}</strong></div>
+          <div class="clock-fact"><span>Peak</span><strong>${escapeHtml(peakLabel)}</strong></div>
+          <div class="clock-fact"><span>Hours</span><strong>${hasData ? activeHours : "—"}</strong></div>
+          <div class="clock-fact"><span>Late</span><strong>${hasData ? `${lateShare}%` : "—"}</strong></div>
         </div>
       </div>
-    </div>`;
-}
-
-function aboutMarkup() {
-  const trackCount = state.data?.tracks?.length || 0;
-  const ttl = state.config?.cacheTtlSeconds || 60;
-  const user = state.username ? `@${state.username}` : "not connected";
-  return `
-    ${titlebar("The Source", "LAST.FM")}
-    <div class="about-view">
-      <p class="about-brand"><i aria-hidden="true"></i> Wall of Tracks · listening archive</p>
-      <h3>A small museum for loud years.</h3>
-      <p>Every sleeve here comes from your recent scrobbles. The browser only speaks to this app’s server; the Last.fm key never leaves it.</p>
-      <div class="about-facts">
-        <span>${escapeHtml(user)}</span>
-        <span>${trackCount} tracks</span>
-        <span>${ttl}s cache</span>
-        <span>Key stays server-side</span>
-      </div>
-      <button class="about-action" type="button" data-action="change-user">Change Last.fm listener →</button>
     </div>`;
 }
 
 function connectMarkup() {
   const ready = state.config?.serverReady !== false;
   const user = state.connectDraft || state.username || "";
-  const note = ready
-    ? "The API key stays on the server. This screen only sends your username there."
-    : "The key stays in .env; the browser never sees it.";
   return `
-    ${titlebar("Connect", "LAST.FM")}
+    ${titlebar("Last.fm", "ACCOUNT")}
     <div class="connect-view">
-      <span class="connect-mark" aria-hidden="true"></span>
-      <h3>Who is listening?</h3>
-      <p>${ready ? "Type your Last.fm username. Your recent scrobbles will be hung on the wall." : "The wall is ready, but its Last.fm key is missing."}</p>
+      <h3>${ready ? "Last.fm" : "Key missing"}</h3>
+      <p>${ready ? "Enter a username." : "Add LASTFM_KEY to .env."}</p>
       <form class="connect-form" data-connect-form>
         <input
           type="text"
           name="username"
           value="${escapeAttr(user)}"
-          placeholder="last.fm username"
+          placeholder="Username"
           autocomplete="off"
           autocapitalize="none"
           spellcheck="false"
           aria-label="Last.fm username"
           ${ready ? "" : "disabled"}
         />
-        <button type="submit" ${ready ? "" : "disabled"}>Tune in</button>
+        <button type="submit" ${ready ? "" : "disabled"}>Connect</button>
       </form>
       ${state.connectError ? `<p class="connect-error">${escapeHtml(state.connectError)}</p>` : ""}
-      <p class="connect-note">${escapeHtml(note)}</p>
     </div>`;
 }
 
 function errorMarkup() {
   const message = state.error || "Last.fm did not answer.";
   return `
-    ${titlebar("Off Air", "TRY AGAIN")}
+    ${titlebar("Offline", "TRY AGAIN")}
     <div class="error-view">
       <span class="error-orbit" aria-hidden="true"></span>
-      <h3>The wall is quiet.</h3>
-      <p>${escapeHtml(message)} The interface is still here; the records are the missing part.</p>
+      <h3>Can’t reach Last.fm.</h3>
+      <p>${escapeHtml(message)}</p>
       <div class="error-actions">
         <button class="ipod-button" type="button" data-action="retry">Try again</button>
         <button class="about-action" type="button" data-action="change-user">Change listener</button>
@@ -1336,10 +1172,9 @@ function errorMarkup() {
 
 function emptyMarkup() {
   return `
-    ${titlebar("The Wall", "0 TRACKS")}
+    ${titlebar("iPod", "0 TRACKS")}
     <div class="screen-message">
-      <h3>A quiet wall.</h3>
-      <p>This Last.fm profile has no scrobbles to show yet. Listen to something, then refresh.</p>
+      <h3>No scrobbles yet.</h3>
       <div class="message-actions">
         <button class="ipod-button" type="button" data-action="refresh">Refresh</button>
         <button class="about-action" type="button" data-action="change-user">Change listener</button>
@@ -1347,283 +1182,21 @@ function emptyMarkup() {
     </div>`;
 }
 
-/* Wall and page chrome */
+/* Listener */
 
-function setFeature(album, { animate = false } = {}) {
-  if (!album) {
-    setFeatureEmpty();
-    return;
-  }
-  const index = state.data?.albums?.findIndex((item) => item.key === album.key) ?? -1;
-  const total = state.data?.albums?.length || 0;
-  const changed = state.featureKey !== album.key;
-  state.featureKey = album.key;
-  state.featureAlbum = album;
-
-  const tracks = getAlbumTracks(album);
-  const playingNow = tracks.some((track) => track.nowPlaying);
-
-  dom.featureTitle.textContent = album.title;
-  dom.featureArtist.textContent = album.artist;
-  dom.featureIndex.textContent = `${String(Math.max(0, index) + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
-  dom.featureMeta.textContent = `${formatCount(album.playCount)} ${plural(album.playCount, "play", "plays")} in this view · ${playingNow ? "now" : album.lastPlayed ? compactDate(album.lastPlayed) : "recently"}`;
-  dom.featureFrame.setAttribute("aria-label", `Open ${album.title} by ${album.artist} in the iPod`);
-  dom.featureFallback.textContent = initials(album.title || album.artist, 2);
-  dom.featureFallback.style.cssText = artFallbackStyle(`${album.title}${album.artist}`);
-  const seen = new Set();
-  const uniqueTracks = [];
-  for (const track of tracks) {
-    const key = track.title.toLocaleLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueTracks.push(track);
-    }
-    if (uniqueTracks.length >= 3) break;
-  }
-
-  if (uniqueTracks.length) {
-    dom.featureTracks.innerHTML = uniqueTracks.map((track, trackIndex) => `
-      <li>
-        <span class="track-number">${String(trackIndex + 1).padStart(2, "0")}</span>
-        <span class="track-title">${escapeHtml(track.title)}</span>
-        <span class="track-count">${track.nowPlaying ? "now" : shortTime(track.playedAt)}</span>
-      </li>`).join("");
-  } else {
-    dom.featureTracks.innerHTML = "";
-  }
-
-  const image = album.image;
-  if (image) {
-    if (dom.featureImage.getAttribute("src") !== image) {
-      dom.featureImage.src = image;
-    }
-    dom.featureImage.alt = `${album.title} by ${album.artist}`;
-    dom.featureImage.hidden = false;
-    if (changed) {
-      dom.featureImage.animate(
-        [
-          { opacity: 0, transform: "scale(1.018)" },
-          { opacity: 1, transform: "scale(1)" },
-        ],
-        { duration: 460, easing: "ease-out" },
-      );
-    }
-  } else {
-    dom.featureImage.hidden = true;
-    dom.featureImage.removeAttribute("src");
-  }
-
-  dom.openExhibit.disabled = false;
-  setExternalAction("open", "Open in the iPod");
-  dom.sourceNote.classList.toggle("is-warning", Boolean(state.warning));
-}
-
-function setFeatureEmpty() {
-  state.featureKey = null;
-  state.featureAlbum = null;
-  dom.featureImage.hidden = true;
-  dom.featureImage.removeAttribute("src");
-  dom.featureFallback.textContent = "WF";
-  dom.featureFallback.style.cssText = artFallbackStyle("quiet wall");
-  dom.featureTitle.textContent = "A quiet wall.";
-  dom.featureArtist.textContent = "Nothing hanging here yet.";
-  dom.featureMeta.textContent = "Play something on Last.fm, then refresh";
-  dom.featureIndex.textContent = "00 / 00";
-  dom.featureTracks.innerHTML = "";
-  dom.featureFrame.setAttribute("aria-label", "No album to open");
-  setExternalAction("refresh", "Refresh the wall");
-}
-
-function setFeatureLoading() {
-  state.featureKey = null;
-  state.featureAlbum = null;
-  dom.featureImage.hidden = true;
-  dom.featureImage.removeAttribute("src");
-  dom.featureFallback.textContent = "WF";
-  dom.featureFallback.style.cssText = artFallbackStyle("tuning in");
-  dom.featureTitle.textContent = "Tuning the wall";
-  dom.featureArtist.textContent = "Hunting down your recent records";
-  dom.featureMeta.textContent = "Last.fm → our server → this wall";
-  dom.featureIndex.textContent = "— / —";
-  dom.featureTracks.innerHTML = "";
-  setExternalAction("none", "Tuning in…");
-  setStats(null);
-}
-
-function showExternalError(message) {
-  state.featureKey = null;
-  state.featureAlbum = null;
-  dom.featureImage.hidden = true;
-  dom.featureImage.removeAttribute("src");
-  dom.featureFallback.textContent = "!";
-  dom.featureFallback.style.cssText = artFallbackStyle("off air");
-  dom.featureTitle.textContent = "The wall is quiet.";
-  dom.featureArtist.textContent = "Last.fm did not answer.";
-  dom.featureMeta.textContent = message;
-  dom.featureIndex.textContent = "— / —";
-  dom.featureTracks.innerHTML = "";
-  setStats(null);
-  setExternalAction("retry", "Try again");
-}
-
-function showExternalIdle(mode) {
-  state.featureKey = null;
-  state.featureAlbum = null;
-  dom.featureImage.hidden = true;
-  dom.featureImage.removeAttribute("src");
-  dom.featureFallback.textContent = mode === "setup" ? "KEY" : "WF";
-  dom.featureFallback.style.cssText = artFallbackStyle(mode === "setup" ? "missing key" : "find a listener");
-  dom.featureTitle.textContent = mode === "setup" ? "Almost ready." : "Hang your first record.";
-  dom.featureArtist.textContent = mode === "setup" ? "The server needs a Last.fm key." : "No Last.fm listener connected.";
-  dom.featureMeta.textContent = mode === "setup"
-    ? "Add LASTFM_KEY to .env and restart the server"
-    : "Choose a username inside the iPod to begin";
-  dom.featureIndex.textContent = "— / —";
-  dom.featureTracks.innerHTML = "";
-  setStats(null);
-  setExternalAction("connect", mode === "setup" ? "Add the key, then connect" : "Connect on the iPod");
-}
-
-function setExternalAction(action, label) {
-  state.externalAction = action;
-  const arrow = action === "open" ? '<span aria-hidden="true">↗</span>' : "";
-  dom.openExhibit.innerHTML = `${escapeHtml(label)} ${arrow}`;
-  dom.openExhibit.disabled = action === "none";
-  dom.featureFrame.setAttribute("aria-disabled", action === "none" ? "true" : "false");
-}
-
-function updateExternalStats(stats) {
-  if (!stats) {
-    setStats(null);
-    return;
-  }
-  setStats(stats);
-}
-
-function setStats(stats) {
-  dom.statTracks.textContent = stats ? formatCount(stats.trackCount) : "—";
-  dom.statAlbums.textContent = stats ? formatCount(stats.albumCount) : "—";
-  dom.statArtists.textContent = stats ? formatCount(stats.artistCount) : "—";
-}
-
-function updatePageChrome() {
-  const username = state.username ? `@${state.username}` : "No listener";
-  dom.deviceUser.textContent = username;
-
-  let label = "Connecting";
-  let cls = "";
-
-  if (state.loading) {
-    label = state.username ? `Tuning in · @${state.username}` : "Connecting";
-  } else if (state.error && !state.data) {
-    label = "Off air";
-    cls = "is-error";
-  } else if (state.config?.serverReady === false) {
-    label = "Setup needed";
-    cls = "is-error";
-  } else if (!state.data) {
-    label = "Waiting for a listener";
-  } else if (state.warning) {
-    label = "Saved copy";
-    cls = "is-cached";
-  } else if (state.cache?.hit) {
-    const age = cacheAgeSeconds();
-    label = `Cached ${formatAge(age)}`;
-    cls = "is-cached";
-  } else {
-    label = "Last.fm · live";
-    cls = "is-live";
-  }
-
-  dom.liveCopy.textContent = label;
-  dom.livePill.classList.toggle("is-live", cls === "is-live");
-  dom.livePill.classList.toggle("is-cached", cls === "is-cached");
-  dom.livePill.classList.toggle("is-error", cls === "is-error");
-
-  let note = "";
-  let warning = false;
-  if (state.loading) {
-    note = "Asking our server for the recent wall. The browser never calls Last.fm.";
-  } else if (state.error && !state.data) {
-    note = `${state.error} Try again from the iPod.`;
-    warning = true;
-  } else if (state.config?.serverReady === false) {
-    note = "The server has no Last.fm API key. Add it outside the browser and restart.";
-    warning = true;
-  } else if (!state.username) {
-    note = "No listener connected yet. Add a Last.fm username inside the iPod.";
-  } else if (state.warning) {
-    note = state.warning;
-    warning = true;
-  } else if (state.data) {
-    const total = state.data.stats?.totalScrobbles;
-    const ttl = state.config?.cacheTtlSeconds || state.data.cache?.ttlSeconds || 60;
-    note = `${total ? `${formatCount(total)} scrobbles on Last.fm · ` : ""}recent tracks cached ${ttl}s on the server.`;
-  } else {
-    note = "A listening archive with one small server behind it.";
-  }
-
-  dom.sourceNote.classList.toggle("is-warning", warning);
-  dom.sourceNote.innerHTML = `<span class="source-mark" aria-hidden="true"></span><span>${escapeHtml(note)}</span>`;
-  document.title = state.data ? `Wall of Tracks — @${state.username}` : "Wall of Tracks — a listening archive";
-}
-
-function cacheAgeSeconds() {
-  const base = state.cache?.ageSeconds || 0;
-  const since = state.receivedAt ? Math.floor((Date.now() - state.receivedAt) / 1000) : 0;
-  return base + Math.max(0, since);
-}
-
-function tickFooter() {
-  if (state.data?.fetchedAt) {
-    dom.footerTime.textContent = `Synced ${shortTime(state.data.fetchedAt)}`;
-  } else {
-    const now = new Date();
-    dom.footerTime.textContent = `Local ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  }
-}
-
-function openDialog() {
-  if (typeof dom.infoDialog.showModal === "function") {
-    dom.infoDialog.showModal();
-  } else {
-    dom.infoDialog.setAttribute("open", "");
-  }
+function updateListener() {
+  const connected = Boolean(state.username);
+  dom.listenerName.textContent = connected ? `@${state.username}` : "Last.fm";
+  dom.listenerButton.setAttribute(
+    "aria-label",
+    connected ? `Listening as @${state.username}. Change Last.fm listener.` : "Connect Last.fm",
+  );
+  dom.listenerButton.classList.toggle("is-connected", Boolean(state.data));
+  dom.listenerButton.classList.toggle("is-error", Boolean(state.error && !state.data));
+  document.title = state.data && state.username ? `Wall of Tracks — @${state.username}` : "Wall of Tracks";
 }
 
 /* Navigation helpers */
-
-function previewFromCurrentScreen() {
-  const screen = state.screen;
-  let album = null;
-
-  if (screen === "tracks") {
-    const track = state.data?.tracks?.[state.listIndex.tracks];
-    if (track) album = getAlbumForTrack(track);
-  } else if (screen === "albums") {
-    album = state.data?.albums?.[state.listIndex.albums] || null;
-  } else if (screen === "artists") {
-    const artist = state.data?.artists?.[state.listIndex.artists];
-    if (artist) album = getAlbumForArtist(artist);
-  } else if (screen === "coverflow") {
-    album = state.data?.albums?.[state.cfIndex] || null;
-  } else if (screen === "album") {
-    album = state.detail?.album || null;
-  } else if (screen === "artist") {
-    const artist = state.detail?.artist;
-    if (artist) album = getAlbumForArtist(artist);
-  } else if (screen === "now") {
-    const track = state.data?.tracks?.[state.nowIndex];
-    if (track) album = getAlbumForTrack(track);
-  }
-
-  if (album) setFeature(album);
-}
-
-function previewTopAlbum() {
-  const album = state.data?.albums?.[0];
-  if (album) setFeature(album);
-}
 
 function detailDestination(fallback) {
   const origin = state.detailFrom;
@@ -1652,10 +1225,6 @@ function getArtistTracks(artist) {
 
 function getAlbumForTrack(track) {
   return state.data?.albums?.find((album) => album.key === track.albumKey) || null;
-}
-
-function getAlbumForArtist(artist) {
-  return state.data?.albums?.find((album) => album.artist.toLocaleLowerCase() === artist.name.toLocaleLowerCase()) || null;
 }
 
 /* Formatting and tiny utilities */
@@ -1750,14 +1319,6 @@ function formatHour(hour) {
   const normalized = ((Number(hour) % 24) + 24) % 24;
   const suffix = normalized >= 12 ? "PM" : "AM";
   return `${normalized % 12 || 12} ${suffix}`;
-}
-
-function formatAge(seconds) {
-  const safe = Math.max(0, Math.floor(seconds || 0));
-  if (safe < 5) return "just now";
-  if (safe < 60) return `${safe}s ago`;
-  if (safe < 3600) return `${Math.floor(safe / 60)}m ago`;
-  return `${Math.floor(safe / 3600)}h ago`;
 }
 
 function clockHeadline(hour) {
