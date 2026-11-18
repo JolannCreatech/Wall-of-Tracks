@@ -1,0 +1,41 @@
+name: wall-of-fame
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      PORT: "3001"
+      LASTFM_KEY: ${LASTFM_KEY:-}
+      LASTFM_USER: ${LASTFM_USER:-}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-60}
+    expose:
+      - "3001"
+    networks:
+      default:
+        aliases:
+          - wof-api
+
+  site:
+    build:
+      context: .
+      dockerfile: Dockerfile.site
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    networks:
+      default:
+        aliases:
+          - wof-site
+    ports:
+      - "${PORT:-3001}:80"

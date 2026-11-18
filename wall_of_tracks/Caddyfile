@@ -1,0 +1,30 @@
+{$SITE_ADDRESS:student18.wt.thomasjuldo.com} {
+	encode zstd gzip
+
+	# Wall of Fame: /wall-of-tracks/ and /wall-of-tracks/api/*
+	redir /wall-of-tracks /wall-of-tracks/ 308
+	handle /wall-of-tracks/api/* {
+		uri strip_prefix /wall-of-tracks
+		reverse_proxy wof-api:3001
+	}
+	handle_path /wall-of-tracks/* {
+		reverse_proxy wof-site:80
+	}
+
+	# Visit counter: /visit-counter/ and /visit-counter/api/*
+	redir /visit-counter /visit-counter/ 308
+	handle_path /visit-counter/api/* {
+		reverse_proxy visit-counter-api-1:8082
+	}
+	handle_path /visit-counter/* {
+		reverse_proxy visit-counter-site-1:80
+	}
+
+	# Keep the visit counter's old root-relative API and assets working.
+	handle_path /api/* {
+		reverse_proxy visit-counter-api-1:8082
+	}
+	handle {
+		reverse_proxy visit-counter-site-1:80
+	}
+}

@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.env.*
+node_modules
+npm-debug.log*
+.DS_Store
+README.md
+compose*.yaml
+compose*.yml
+Caddyfile
+Dockerfile
+Dockerfile.site

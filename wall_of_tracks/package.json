@@ -1,0 +1,14 @@
+{
+  "name": "wall-of-fame",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A listening archive shaped like an old iPod.",
+  "scripts": {
+    "start": "node api/server.js",
+    "dev": "node --watch api/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

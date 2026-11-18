@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#e9e2d6" />
+    <meta
+      name="description"
+      content="Wall of Tracks — a tiny listening museum built from your Last.fm scrobbles."
+    />
+    <title>Wall of Tracks — a listening archive</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="room-light" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="page">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="Wall of Tracks home">
+          <span class="brand-record" aria-hidden="true"><span></span></span>
+          <span class="brand-name">Wall of Tracks</span>
+          <span class="brand-edition">A listening archive</span>
+        </a>
+        <div class="topbar-meta">
+          <span class="live-pill" id="live-pill">
+            <span class="live-dot" aria-hidden="true"></span>
+            <span id="live-copy">Connecting</span>
+          </span>
+          <button class="topbar-link" id="help-button" type="button">How it works</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="wall-panel" aria-label="Currently on the wall">
+          <div class="intro">
+            <p class="eyebrow">
+              <span class="eyebrow-rule" aria-hidden="true"></span>
+              A personal listening museum
+            </p>
+            <h1>Every song<br /><em>hangs here.</em></h1>
+            <p class="lede">
+              Your latest scrobbles, pulled from the dark and framed in the light.
+              Turn the wheel to walk the gallery.
+            </p>
+          </div>
+
+          <article class="exhibit" id="exhibit" aria-live="polite">
+            <div class="exhibit-art-column">
+              <button class="feature-frame" id="feature-frame" type="button" aria-label="Open featured album in the iPod">
+                <span class="feature-mat">
+                  <span class="art-fallback feature-fallback" id="feature-fallback" aria-hidden="true">W</span>
+                  <img class="feature-image" id="feature-image" alt="" hidden />
+                </span>
+                <span class="frame-label">
+                  <span>On the wall</span>
+                  <span id="feature-index">00 / 00</span>
+                </span>
+              </button>
+              <span class="exhibit-pin exhibit-pin--one" aria-hidden="true"></span>
+              <span class="exhibit-pin exhibit-pin--two" aria-hidden="true"></span>
+            </div>
+
+            <div class="exhibit-copy">
+              <p class="exhibit-kicker"><span aria-hidden="true"></span> Currently on view</p>
+              <h2 id="feature-title">Waiting for a record</h2>
+              <p class="feature-artist" id="feature-artist">Connect Last.fm to begin the exhibition</p>
+              <div class="exhibit-rule" aria-hidden="true"></div>
+              <p class="feature-meta" id="feature-meta">No scrobbles yet</p>
+              <ol class="feature-tracks" id="feature-tracks"></ol>
+              <button class="exhibit-link" id="open-exhibit" type="button">
+                Open in the iPod
+                <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </article>
+
+          <div class="wall-foot">
+            <dl class="stats" aria-label="Listening stats">
+              <div><dt>Tracks</dt><dd id="stat-tracks">—</dd></div>
+              <div><dt>Albums</dt><dd id="stat-albums">—</dd></div>
+              <div><dt>Artists</dt><dd id="stat-artists">—</dd></div>
+            </dl>
+            <p class="source-note" id="source-note">
+              <span class="source-mark" aria-hidden="true"></span>
+              <span>Recent music, served through one small cache.</span>
+            </p>
+          </div>
+        </section>
+
+        <section class="device-column" aria-label="Wall of Tracks iPod">
+          <div class="mobile-intro">
+            <p class="eyebrow"><span class="eyebrow-rule" aria-hidden="true"></span> A personal listening museum</p>
+            <h2>Every song <em>hangs here.</em></h2>
+            <p>Your latest scrobbles, framed in the light. Turn the wheel to walk the gallery.</p>
+          </div>
+
+          <div class="device-caption">
+            <span>Object 001</span>
+            <span id="device-user">No listener</span>
+          </div>
+
+          <div class="ipod-stage">
+            <div class="ipod-halo" aria-hidden="true"></div>
+            <div class="ipod-shadow" aria-hidden="true"></div>
+
+            <div class="ipod" id="ipod">
+              <div class="ipod-sheen" aria-hidden="true"></div>
+
+              <div class="screen-bezel">
+                <div class="screen theme-dark is-boot" id="screen">
+                  <div class="screen-status" id="screen-status">
+                    <span class="status-left" id="status-left">Wall of Tracks</span>
+                    <span class="status-right">
+                      <span class="status-paused" id="status-playing" aria-hidden="true"></span>
+                      <span class="battery" aria-label="Battery full"><i></i></span>
+                    </span>
+                  </div>
+                  <div class="screen-content" id="screen-content"></div>
+                  <div class="screen-glare" aria-hidden="true"></div>
+                </div>
+              </div>
+
+              <div class="click-wheel" id="wheel" aria-label="iPod click wheel. Drag up or down to scroll.">
+                <button class="wheel-key wheel-key--menu" id="wheel-menu" type="button">MENU</button>
+                <button class="wheel-key wheel-key--prev" id="wheel-prev" type="button" aria-label="Previous">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5 10 12l7 7M10 5l-7 7 7 7"/></svg>
+                </button>
+                <button class="wheel-key wheel-key--next" id="wheel-next" type="button" aria-label="Next">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 5 7 7-7 7M14 5l7 7-7 7"/></svg>
+                </button>
+                <button class="wheel-key wheel-key--play" id="wheel-play" type="button" aria-label="Now playing">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l9-7z"/><path class="pause-bars" d="M17 5v14M21 5v14"/></svg>
+                </button>
+                <span class="wheel-visual" aria-hidden="true"></span>
+                <button class="wheel-center" id="wheel-center" type="button" aria-label="Select">
+                  <span></span>
+                </button>
+              </div>
+
+              <div class="ipod-foot">
+                <span class="ipod-etch">Wall of Tracks</span>
+                <span class="ipod-model">Listens like it’s 2005</span>
+              </div>
+            </div>
+          </div>
+
+          <p class="device-hint">
+            <span class="hint-arrows" aria-hidden="true">↑ ↓</span>
+            Spin the wheel or drag it. Press center to choose.
+          </p>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>Scrobbles by Last.fm</span>
+        <span class="footer-center">Key stays on the server · Cached answers · Built to be looked at</span>
+        <span id="footer-time">—</span>
+      </footer>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <dialog class="info-dialog" id="info-dialog">
+      <div class="dialog-head">
+        <p class="eyebrow"><span class="eyebrow-rule" aria-hidden="true"></span> The small print</p>
+        <button class="dialog-close" id="dialog-close" type="button" aria-label="Close">×</button>
+      </div>
+      <h2>A wall that listens.</h2>
+      <p>
+        Wall of Tracks turns the last 200 songs on your Last.fm profile into a pocket-sized
+        gallery. The iPod is both the exhibition and the remote: spin the wheel to hang a
+        different record on the wall.
+      </p>
+      <div class="dialog-grid">
+        <div>
+          <h3>Controls</h3>
+          <p>Drag or scroll on the wheel · <kbd>↑</kbd><kbd>↓</kbd> to browse · <kbd>Enter</kbd> to select · <kbd>Esc</kbd> to go back.</p>
+        </div>
+        <div>
+          <h3>How it works</h3>
+          <p>
+            The browser only speaks to this little server. The server keeps the Last.fm key,
+            caches recent tracks, and quietly proxies every sleeve image.
+          </p>
+        </div>
+      </div>
+      <p class="dialog-foot">
+        Album covers and listening data belong to their artists and to you. Data courtesy of
+        <a href="https://www.last.fm" target="_blank" rel="noreferrer">Last.fm</a>.
+      </p>
+    </dialog>
+
+    <noscript>
+      <p class="noscript">This little museum needs JavaScript. The Last.fm key is still safely on the server.</p>
+    </noscript>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
